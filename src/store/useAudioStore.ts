@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Surah } from '../types';
 
 interface AudioState {
