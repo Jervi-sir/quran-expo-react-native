@@ -1,15 +1,39 @@
-import { Surah } from '../types';
+import { ApiResponse, Reciter, SurahAudio } from '../types';
 
-const MOCK_SURAHS: Surah[] = [
-    { id: 1, name_en: 'Al-Fatihah', name_ar: 'الفاتحة', audio_url: 'https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/1.mp3' },
-    { id: 2, name_en: 'Al-Baqarah', name_ar: 'البقرة', audio_url: 'https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/2.mp3' },
-    { id: 3, name_en: 'Aal-E-Imran', name_ar: 'آل عمران', audio_url: 'https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/3.mp3' },
-];
+const BASE_URL = 'https://quran-api.gacembekhira.workers.dev';
 
-export const fetchSurahs = async (): Promise<Surah[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(MOCK_SURAHS);
-        }, 1000);
-    });
+// ── Reciters (with nested surahs) ──────────────────────────
+export const fetchReciters = async (): Promise<Reciter[]> => {
+    const res = await fetch(`${BASE_URL}/api/reciters`);
+    const json: ApiResponse<Reciter[]> = await res.json();
+
+    if (!json.success) {
+        throw new Error(json.error ?? 'Failed to fetch reciters');
+    }
+
+    return json.data;
+};
+
+// ── Single reciter by ID ───────────────────────────────────
+export const fetchReciter = async (id: number): Promise<Reciter> => {
+    const res = await fetch(`${BASE_URL}/api/reciters/${id}`);
+    const json: ApiResponse<Reciter> = await res.json();
+
+    if (!json.success) {
+        throw new Error(json.error ?? 'Reciter not found');
+    }
+
+    return json.data;
+};
+
+// ── Flat list of surahs ────────────────────────────────────
+export const fetchSurahs = async (): Promise<SurahAudio[]> => {
+    const res = await fetch(`${BASE_URL}/api/surahs`);
+    const json: ApiResponse<SurahAudio[]> = await res.json();
+
+    if (!json.success) {
+        throw new Error(json.error ?? 'Failed to fetch surahs');
+    }
+
+    return json.data;
 };

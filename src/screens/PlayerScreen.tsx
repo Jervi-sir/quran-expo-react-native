@@ -12,7 +12,6 @@ import Slider from '@react-native-community/slider';
 import { useAudioStore } from '../store/useAudioStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0];
 
 export default function PlayerScreen() {
@@ -27,7 +26,7 @@ export default function PlayerScreen() {
         playbackRate,
         setPlaybackRate,
         downloadTrack,
-        downloadedFiles,
+        isDownloaded,
     } = useAudioStore();
 
     const [downloading, setDownloading] = useState(false);
@@ -42,7 +41,7 @@ export default function PlayerScreen() {
         );
     }
 
-    const isDownloaded = !!downloadedFiles[currentTrack.id];
+    const downloaded = isDownloaded(currentTrack.audioId);
 
     const handlePlayPause = () => {
         isPlaying ? pauseTrack() : resumeTrack();
@@ -61,7 +60,7 @@ export default function PlayerScreen() {
         setDownloading(true);
         try {
             await downloadTrack(currentTrack);
-            Alert.alert('Downloaded', `${currentTrack.name_en} saved for offline.`);
+            Alert.alert('Downloaded', `${currentTrack.surahNameEn} saved for offline.`);
         } catch {
             Alert.alert('Error', 'Failed to download.');
         } finally {
@@ -82,22 +81,23 @@ export default function PlayerScreen() {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
 
-            {/* Decorative top area */}
+            {/* Decorative artwork */}
             <View style={styles.artworkArea}>
                 <View style={styles.artworkCircleOuter}>
                     <View style={styles.artworkCircleInner}>
-                        <Text style={styles.artworkNumber}>{currentTrack.id}</Text>
+                        <Text style={styles.artworkNumber}>{currentTrack.surahNumber}</Text>
                     </View>
                 </View>
             </View>
 
             {/* Track info */}
             <View style={styles.infoArea}>
-                <Text style={styles.arabicTitle}>{currentTrack.name_ar}</Text>
-                <Text style={styles.englishTitle}>{currentTrack.name_en}</Text>
+                <Text style={styles.arabicTitle}>{currentTrack.surahNameAr}</Text>
+                <Text style={styles.englishTitle}>{currentTrack.surahNameEn}</Text>
+                <Text style={styles.reciterLabel}>{currentTrack.reciterName}</Text>
 
-                {/* Download status / button */}
-                {isDownloaded ? (
+                {/* Download status */}
+                {downloaded ? (
                     <View style={styles.downloadedBadge}>
                         <Text style={styles.downloadedText}>✓  Available Offline</Text>
                     </View>
@@ -115,7 +115,7 @@ export default function PlayerScreen() {
                 )}
             </View>
 
-            {/* Progress */}
+            {/* Progress slider */}
             <View style={styles.progressArea}>
                 <Slider
                     style={styles.slider}
@@ -133,18 +133,14 @@ export default function PlayerScreen() {
                 </View>
             </View>
 
-            {/* Controls */}
+            {/* Playback controls */}
             <View style={styles.controlsRow}>
                 <TouchableOpacity style={styles.secondaryBtn} onPress={handleSeekBackward}>
                     <Text style={styles.secondaryBtnIcon}>↺</Text>
                     <Text style={styles.secondaryBtnLabel}>10s</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.playBtn}
-                    onPress={handlePlayPause}
-                >
+                <TouchableOpacity activeOpacity={0.8} style={styles.playBtn} onPress={handlePlayPause}>
                     <Text style={styles.playBtnIcon}>{isPlaying ? '⏸' : '▶'}</Text>
                 </TouchableOpacity>
 
@@ -154,12 +150,8 @@ export default function PlayerScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Speed control */}
-            <TouchableOpacity
-                style={styles.speedChip}
-                activeOpacity={0.7}
-                onPress={handleCycleSpeed}
-            >
+            {/* Speed chip */}
+            <TouchableOpacity style={styles.speedChip} activeOpacity={0.7} onPress={handleCycleSpeed}>
                 <Text style={styles.speedChipText}>{playbackRate}×</Text>
             </TouchableOpacity>
         </View>
@@ -208,29 +200,21 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    artworkNumber: {
-        fontSize: 48,
-        fontWeight: '200',
-        color: '#C9A84C',
-    },
+    artworkNumber: { fontSize: 48, fontWeight: '200', color: '#C9A84C' },
 
     // Info
-    infoArea: {
-        alignItems: 'center',
-        paddingHorizontal: 24,
-        marginBottom: 8,
-    },
-    arabicTitle: {
-        fontSize: 36,
-        color: '#C9A84C',
-        fontWeight: '600',
-        marginBottom: 4,
-    },
+    infoArea: { alignItems: 'center', paddingHorizontal: 24, marginBottom: 8 },
+    arabicTitle: { fontSize: 36, color: '#C9A84C', fontWeight: '600', marginBottom: 4 },
     englishTitle: {
         fontSize: 16,
         color: 'rgba(255,255,255,0.5)',
         fontWeight: '500',
         letterSpacing: 1,
+        marginBottom: 4,
+    },
+    reciterLabel: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.3)',
         marginBottom: 16,
     },
     downloadedBadge: {
@@ -241,11 +225,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(74,222,128,0.25)',
     },
-    downloadedText: {
-        color: '#4ADE80',
-        fontSize: 13,
-        fontWeight: '600',
-    },
+    downloadedText: { color: '#4ADE80', fontSize: 13, fontWeight: '600' },
     downloadBtn: {
         paddingHorizontal: 20,
         paddingVertical: 10,
@@ -253,32 +233,13 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(201,168,76,0.4)',
     },
-    downloadBtnText: {
-        color: '#C9A84C',
-        fontSize: 13,
-        fontWeight: '600',
-    },
+    downloadBtnText: { color: '#C9A84C', fontSize: 13, fontWeight: '600' },
 
     // Progress
-    progressArea: {
-        width: '100%',
-        paddingHorizontal: 24,
-        marginTop: 24,
-    },
-    slider: {
-        width: '100%',
-        height: 30,
-    },
-    timeRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 4,
-    },
-    timeText: {
-        color: 'rgba(255,255,255,0.35)',
-        fontSize: 12,
-        fontWeight: '500',
-    },
+    progressArea: { width: '100%', paddingHorizontal: 24, marginTop: 24 },
+    slider: { width: '100%', height: 30 },
+    timeRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
+    timeText: { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '500' },
 
     // Controls
     controlsRow: {
@@ -288,19 +249,9 @@ const styles = StyleSheet.create({
         gap: 36,
         marginTop: 24,
     },
-    secondaryBtn: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    secondaryBtnIcon: {
-        fontSize: 28,
-        color: 'rgba(255,255,255,0.6)',
-    },
-    secondaryBtnLabel: {
-        fontSize: 11,
-        color: 'rgba(255,255,255,0.35)',
-        marginTop: 2,
-    },
+    secondaryBtn: { alignItems: 'center', justifyContent: 'center' },
+    secondaryBtnIcon: { fontSize: 28, color: 'rgba(255,255,255,0.6)' },
+    secondaryBtnLabel: { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
     playBtn: {
         width: 72,
         height: 72,
@@ -314,10 +265,7 @@ const styles = StyleSheet.create({
         shadowRadius: 16,
         elevation: 8,
     },
-    playBtnIcon: {
-        fontSize: 28,
-        color: '#0D1B1E',
-    },
+    playBtnIcon: { fontSize: 28, color: '#0D1B1E' },
 
     // Speed
     speedChip: {
@@ -327,9 +275,5 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 16,
     },
-    speedChipText: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 14,
-        fontWeight: '600',
-    },
+    speedChipText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600' },
 });

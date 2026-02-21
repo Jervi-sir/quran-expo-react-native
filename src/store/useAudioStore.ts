@@ -1,26 +1,29 @@
 import { create } from 'zustand';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Surah } from '../types';
+import { Track } from '../types';
 
 interface AudioState {
-    currentTrack: Surah | null;
+    currentTrack: Track | null;
     sound: Audio.Sound | null;
     isPlaying: boolean;
     positionMillis: number;
     durationMillis: number;
     playbackRate: number;
-    downloadedFiles: Record<number, string>; // Maps surah id to local uri
+    downloadedFiles: Record<string, string>; // key = "audioId" -> local uri
 
     // Actions
-    playTrack: (track: Surah) => Promise<void>;
+    playTrack: (track: Track) => Promise<void>;
     pauseTrack: () => Promise<void>;
     resumeTrack: () => Promise<void>;
     seek: (millis: number) => Promise<void>;
     setPlaybackRate: (rate: number) => Promise<void>;
-    downloadTrack: (track: Surah) => Promise<void>;
+    downloadTrack: (track: Track) => Promise<void>;
     checkDownloads: () => Promise<void>;
+    isDownloaded: (audioId: number) => boolean;
 }
+
+const downloadKey = (audioId: number) => `audio_${audioId}`;
 
 export const useAudioStore = create<AudioState>((set, get) => ({
     currentTrack: null,
@@ -31,9 +34,10 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     playbackRate: 1.0,
     downloadedFiles: {},
 
-    playTrack: async (track: Surah) => {
+    playTrack: async (track: Track) => {
         const { sound, downloadedFiles } = get();
 
+        // Unload any previous sound
         if (sound) {
             await sound.unloadAsync();
             set({ sound: null, isPlaying: false, positionMillis: 0 });
@@ -45,8 +49,10 @@ export const useAudioStore = create<AudioState>((set, get) => ({
                 playsInSilentModeIOS: true,
             });
 
-            const localUri = downloadedFiles[track.id];
-            const sourceUri = localUri ? localUri : track.audio_url;
+            // Prefer local file, fall back to remote stream
+            const key = downloadKey(track.audioId);
+            const localUri = downloadedFiles[key];
+            const sourceUri = localUri ?? track.fileUrl;
 
             const { sound: newSound } = await Audio.Sound.createAsync(
                 { uri: sourceUri },
@@ -102,16 +108,17 @@ export const useAudioStore = create<AudioState>((set, get) => ({
         set({ playbackRate: rate });
     },
 
-    downloadTrack: async (track: Surah) => {
-        // using document directory for saving mp3 files
-        const fileUri = `${FileSystem.documentDirectory}surah_${track.id}.mp3`;
+    downloadTrack: async (track: Track) => {
+        const key = downloadKey(track.audioId);
+        const fileUri = `${FileSystem.documentDirectory}${key}.mp3`;
+
         try {
             const downloadResumable = FileSystem.createDownloadResumable(
-                track.audio_url,
+                track.fileUrl,
                 fileUri,
                 {},
-                (_downloadProgress) => {
-                    // You could track progress here via a callback or updating state
+                (_progress) => {
+                    // Optional: track download progress here
                 }
             );
             const result = await downloadResumable.downloadAsync();
@@ -119,7 +126,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
                 set((state) => ({
                     downloadedFiles: {
                         ...state.downloadedFiles,
-                        [track.id]: result.uri,
+                        [key]: result.uri,
                     },
                 }));
             }
@@ -129,25 +136,25 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     },
 
     checkDownloads: async () => {
-        // Basic check inside the document directory
         if (!FileSystem.documentDirectory) return;
 
         try {
-            const dirInfo = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
-            const downloaded: Record<number, string> = {};
+            const files = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory);
+            const downloaded: Record<string, string> = {};
 
-            for (const file of dirInfo) {
-                if (file.startsWith('surah_') && file.endsWith('.mp3')) {
-                    const idStr = file.replace('surah_', '').replace('.mp3', '');
-                    const id = parseInt(idStr, 10);
-                    if (!isNaN(id)) {
-                        downloaded[id] = `${FileSystem.documentDirectory}${file}`;
-                    }
+            for (const file of files) {
+                if (file.startsWith('audio_') && file.endsWith('.mp3')) {
+                    const key = file.replace('.mp3', '');
+                    downloaded[key] = `${FileSystem.documentDirectory}${file}`;
                 }
             }
             set({ downloadedFiles: downloaded });
         } catch (e) {
             console.error('Error checking local downloads:', e);
         }
+    },
+
+    isDownloaded: (audioId: number) => {
+        return !!get().downloadedFiles[downloadKey(audioId)];
     },
 }));
